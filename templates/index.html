@@ -3,12 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Face Tracking Camera</title>
-    <!-- Add TensorFlow.js and face-landmarks-detection -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection"></script>
+    <title>Mobile Camera Stream</title>
     <style>
         * {
             margin: 0;
@@ -71,14 +66,7 @@
             height: auto;
             border-radius: 5px;
             display: block;
-            transform: scaleX(-1);
-        }
-
-        #canvasElement {
-            position: absolute;
-            top: 1rem;
-            left: 1rem;
-            transform: scaleX(-1);
+            transform: scaleX(-1); /* Mirror the video */
         }
 
         .camera-controls {
@@ -86,7 +74,6 @@
             display: flex;
             justify-content: center;
             gap: 1rem;
-            flex-wrap: wrap;
         }
 
         .control-btn {
@@ -112,31 +99,37 @@
             background-color: #cc3333;
         }
 
-        .stats {
-            position: absolute;
-            top: 1.5rem;
-            left: 1.5rem;
-            background-color: rgba(0, 0, 0, 0.6);
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            z-index: 10;
-        }
-
         @keyframes glow {
-            from { text-shadow: 0 0 5px #00ff88, 0 0 10px #00ff88; }
-            to { text-shadow: 0 0 10px #00ff88, 0 0 20px #00ff88; }
+            from {
+                text-shadow: 0 0 5px #00ff88, 0 0 10px #00ff88;
+            }
+            to {
+                text-shadow: 0 0 10px #00ff88, 0 0 20px #00ff88;
+            }
         }
 
         @keyframes redPulse {
-            0% { box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3); }
-            50% { box-shadow: 0 0 20px rgba(255, 0, 0, 0.5), 0 0 30px rgba(255, 0, 0, 0.3); }
-            100% { box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3); }
+            0% {
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            }
+            50% {
+                box-shadow: 0 0 20px rgba(255, 0, 0, 0.5),
+                           0 0 30px rgba(255, 0, 0, 0.3);
+            }
+            100% {
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            }
         }
 
         @keyframes borderGlow {
-            0% { opacity: 0.5; filter: blur(3px); }
-            100% { opacity: 0.8; filter: blur(5px); }
+            0% {
+                opacity: 0.5;
+                filter: blur(3px);
+            }
+            100% {
+                opacity: 0.8;
+                filter: blur(5px);
+            }
         }
 
         .live-indicator {
@@ -149,7 +142,6 @@
             background-color: rgba(0, 0, 0, 0.6);
             padding: 0.5rem 1rem;
             border-radius: 20px;
-            z-index: 10;
         }
 
         .record-dot {
@@ -166,73 +158,51 @@
         }
 
         @media (max-width: 768px) {
-            .container { padding: 0.5rem; }
-            h1 { font-size: 2rem; margin: 0.5rem 0; }
+            .container {
+                padding: 0.5rem;
+            }
+
+            h1 {
+                font-size: 2rem;
+                margin: 0.5rem 0;
+            }
+            
             .live-indicator {
                 top: 1rem;
                 right: 1rem;
                 padding: 0.3rem 0.8rem;
+            }
+
+            .camera-controls {
+                flex-wrap: wrap;
             }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Face Tracking</h1>
+        <h1>Live Camera</h1>
         <div class="video-container">
             <div class="live-indicator">
                 <div class="record-dot"></div>
                 <span>LIVE</span>
             </div>
-            <div class="stats">
-                <div id="fps">FPS: 0</div>
-                <div id="confidence">Confidence: 0%</div>
-            </div>
             <video id="videoElement" autoplay playsinline></video>
-            <canvas id="canvasElement"></canvas>
         </div>
         <div class="camera-controls">
             <button class="control-btn start">Start Camera</button>
             <button class="control-btn stop">Stop Camera</button>
             <button class="control-btn switch">Switch Camera</button>
-            <button class="control-btn toggle-track">Toggle Tracking</button>
         </div>
     </div>
 
     <script>
         const videoElement = document.getElementById('videoElement');
-        const canvasElement = document.getElementById('canvasElement');
-        const canvasCtx = canvasElement.getContext('2d');
         const startButton = document.querySelector('.control-btn.start');
         const stopButton = document.querySelector('.control-btn.stop');
         const switchButton = document.querySelector('.control-btn.switch');
-        const toggleTrackButton = document.querySelector('.control-btn.toggle-track');
-        const fpsElement = document.getElementById('fps');
-        const confidenceElement = document.getElementById('confidence');
-
         let currentStream = null;
-        let facingMode = "user";
-        let model = null;
-        let isTracking = false;
-        let lastTime = Date.now();
-        let frameCount = 0;
-
-        // Load the face detection model
-        async function loadModel() {
-            try {
-                model = await faceLandmarksDetection.load(
-                    faceLandmarksDetection.SupportedPackages.mediapipeFacemesh,
-                    { maxFaces: 1 }
-                );
-                toggleTrackButton.disabled = false;
-            } catch (err) {
-                console.error("Error loading model:", err);
-                alert("Error loading face tracking model. Please try again.");
-            }
-        }
-
-        // Initialize face tracking
-        loadModel();
+        let facingMode = "user"; // Start with front camera
 
         async function startCamera() {
             try {
@@ -252,16 +222,6 @@
                 const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 videoElement.srcObject = stream;
                 currentStream = stream;
-
-                // Set canvas size after video loads
-                videoElement.onloadedmetadata = () => {
-                    canvasElement.width = videoElement.videoWidth;
-                    canvasElement.height = videoElement.videoHeight;
-                };
-
-                if (isTracking) {
-                    requestAnimationFrame(detectFaces);
-                }
             } catch (err) {
                 console.error("Error accessing camera:", err);
                 alert("Error accessing camera. Please make sure you've granted camera permissions.");
@@ -274,7 +234,6 @@
                 videoElement.srcObject = null;
                 currentStream = null;
             }
-            isTracking = false;
         }
 
         function switchCamera() {
@@ -282,67 +241,12 @@
             startCamera();
         }
 
-        async function detectFaces() {
-            if (!isTracking || !model || !currentStream) return;
-
-            try {
-                const predictions = await model.estimateFaces({
-                    input: videoElement,
-                    returnTensors: false,
-                    flipHorizontal: false,
-                    predictIrises: true
-                });
-
-                // Clear the canvas
-                canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-
-                // Draw face landmarks
-                predictions.forEach(face => {
-                    // Draw face mesh
-                    canvasCtx.strokeStyle = '#00ff88';
-                    canvasCtx.lineWidth = 1;
-
-                    // Draw face mesh points
-                    face.scaledMesh.forEach(point => {
-                        canvasCtx.beginPath();
-                        canvasCtx.arc(point[0], point[1], 1, 0, 3 * Math.PI);
-                        canvasCtx.stroke();
-                    });
-
-                    // Update confidence
-                    confidenceElement.textContent = `Confidence: ${(face.faceInViewConfidence * 100).toFixed(1)}%`;
-                });
-
-                // Calculate and update FPS
-                frameCount++;
-                const currentTime = Date.now();
-                if (currentTime - lastTime >= 1000) {
-                    fpsElement.textContent = `FPS: ${frameCount}`;
-                    frameCount = 0;
-                    lastTime = currentTime;
-                }
-
-                requestAnimationFrame(detectFaces);
-            } catch (err) {
-                console.error("Error in face detection:", err);
-            }
-        }
-
-        function toggleTracking() {
-            isTracking = !isTracking;
-            toggleTrackButton.textContent = isTracking ? 'Stop Tracking' : 'Start Tracking';
-            if (isTracking && currentStream) {
-                requestAnimationFrame(detectFaces);
-            }
-        }
-
         // Event listeners
         startButton.addEventListener('click', startCamera);
         stopButton.addEventListener('click', stopCamera);
         switchButton.addEventListener('click', switchCamera);
-        toggleTrackButton.addEventListener('click', toggleTracking);
 
-        // Check for camera support
+        // Check for camera support when page loads
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             alert("Your browser doesn't support camera access");
         }
