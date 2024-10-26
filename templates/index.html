@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Python Face Tracking</title>
+    <title>Mobile Camera Stream</title>
     <style>
         * {
             margin: 0;
@@ -61,11 +61,75 @@
             animation: borderGlow 2s ease-in-out infinite alternate;
         }
 
-        .video-feed {
+        #videoElement {
             width: 100%;
             height: auto;
             border-radius: 5px;
             display: block;
+            transform: scaleX(-1); /* Mirror the video */
+        }
+
+        .camera-controls {
+            margin-top: 1rem;
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+        }
+
+        .control-btn {
+            padding: 0.8rem 1.5rem;
+            border: none;
+            border-radius: 5px;
+            background-color: #00ff88;
+            color: #1a1a1a;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .control-btn:hover {
+            background-color: #00cc6a;
+        }
+
+        .control-btn.stop {
+            background-color: #ff4444;
+        }
+
+        .control-btn.stop:hover {
+            background-color: #cc3333;
+        }
+
+        @keyframes glow {
+            from {
+                text-shadow: 0 0 5px #00ff88, 0 0 10px #00ff88;
+            }
+            to {
+                text-shadow: 0 0 10px #00ff88, 0 0 20px #00ff88;
+            }
+        }
+
+        @keyframes redPulse {
+            0% {
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            }
+            50% {
+                box-shadow: 0 0 20px rgba(255, 0, 0, 0.5),
+                           0 0 30px rgba(255, 0, 0, 0.3);
+            }
+            100% {
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            }
+        }
+
+        @keyframes borderGlow {
+            0% {
+                opacity: 0.5;
+                filter: blur(3px);
+            }
+            100% {
+                opacity: 0.8;
+                filter: blur(5px);
+            }
         }
 
         .live-indicator {
@@ -78,7 +142,6 @@
             background-color: rgba(0, 0, 0, 0.6);
             padding: 0.5rem 1rem;
             border-radius: 20px;
-            z-index: 10;
         }
 
         .record-dot {
@@ -89,48 +152,104 @@
             animation: recordBlink 1s ease-in-out infinite;
         }
 
-        @keyframes glow {
-            from { text-shadow: 0 0 5px #00ff88, 0 0 10px #00ff88; }
-            to { text-shadow: 0 0 10px #00ff88, 0 0 20px #00ff88; }
-        }
-
-        @keyframes redPulse {
-            0% { box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3); }
-            50% { box-shadow: 0 0 20px rgba(255, 0, 0, 0.5), 0 0 30px rgba(255, 0, 0, 0.3); }
-            100% { box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3); }
-        }
-
-        @keyframes borderGlow {
-            0% { opacity: 0.5; filter: blur(3px); }
-            100% { opacity: 0.8; filter: blur(5px); }
-        }
-
         @keyframes recordBlink {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.4; }
         }
 
         @media (max-width: 768px) {
-            .container { padding: 0.5rem; }
-            h1 { font-size: 2rem; margin: 0.5rem 0; }
+            .container {
+                padding: 0.5rem;
+            }
+
+            h1 {
+                font-size: 2rem;
+                margin: 0.5rem 0;
+            }
+            
             .live-indicator {
                 top: 1rem;
                 right: 1rem;
                 padding: 0.3rem 0.8rem;
+            }
+
+            .camera-controls {
+                flex-wrap: wrap;
             }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Python Face Tracking</h1>
+        <h1>Live Camera</h1>
         <div class="video-container">
             <div class="live-indicator">
                 <div class="record-dot"></div>
                 <span>LIVE</span>
             </div>
-            <img class="video-feed" src="{{ url_for('video_feed') }}" alt="Face Tracking Feed">
+            <video id="videoElement" autoplay playsinline></video>
+        </div>
+        <div class="camera-controls">
+            <button class="control-btn start">Start Camera</button>
+            <button class="control-btn stop">Stop Camera</button>
+            <button class="control-btn switch">Switch Camera</button>
         </div>
     </div>
+
+    <script>
+        const videoElement = document.getElementById('videoElement');
+        const startButton = document.querySelector('.control-btn.start');
+        const stopButton = document.querySelector('.control-btn.stop');
+        const switchButton = document.querySelector('.control-btn.switch');
+        let currentStream = null;
+        let facingMode = "user"; // Start with front camera
+
+        async function startCamera() {
+            try {
+                if (currentStream) {
+                    currentStream.getTracks().forEach(track => track.stop());
+                }
+
+                const constraints = {
+                    video: {
+                        facingMode: facingMode,
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    },
+                    audio: false
+                };
+
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                videoElement.srcObject = stream;
+                currentStream = stream;
+            } catch (err) {
+                console.error("Error accessing camera:", err);
+                alert("Error accessing camera. Please make sure you've granted camera permissions.");
+            }
+        }
+
+        function stopCamera() {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+                videoElement.srcObject = null;
+                currentStream = null;
+            }
+        }
+
+        function switchCamera() {
+            facingMode = facingMode === "user" ? "environment" : "user";
+            startCamera();
+        }
+
+        // Event listeners
+        startButton.addEventListener('click', startCamera);
+        stopButton.addEventListener('click', stopCamera);
+        switchButton.addEventListener('click', switchCamera);
+
+        // Check for camera support when page loads
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            alert("Your browser doesn't support camera access");
+        }
+    </script>
 </body>
 </html>
